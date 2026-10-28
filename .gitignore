@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 .venv/
 __pycache__/
 .ipynb_checkpoints/
@@ -12,3 +13,19 @@ hasil/ablasi_cepat.csv
 *.log
 *.out
 *.synctex.gz
+=======
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store
+hasil/ablasi_cepat.csv
+# berkas sementara LaTeX
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+>>>>>>> 9c3d42c (running bagian C)
