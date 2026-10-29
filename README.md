@@ -8,12 +8,12 @@ Tugas Workshop Deep Learning — Teknik Telekomunikasi ITERA.
 
 | Peran | Nama | NIM |
 |---|---|---|
-| Ketua | [Nama Lengkap] | [NIM] |
-| Anggota | [Nama Lengkap] | [NIM] |
-| Anggota | [Nama Lengkap] | [NIM] |
+| Ketua | [Grasia Okta Adelia] | [124400059] |
+| Anggota | [Egista Marga Kola] | [124400003] |
+| Anggota | [Muhammad Allam Dzaky] | [124400013] |
 
-- **Kelas:** [RA / RB]
-- **Lokasi kelompok:** [kode] — [nama lokasi] (digit terakhir NIM terkecil)
+- **Kelas:** [RA]
+- **Lokasi kelompok:** [3] — [Stadio San Rio] (3)
 - **Laporan:** [`laporan-latex/main.pdf` atau `laporan-typst/main.pdf`]
 
 ## Cara Menjalankan
