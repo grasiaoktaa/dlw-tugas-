@@ -14,7 +14,7 @@ Tugas Workshop Deep Learning — Teknik Telekomunikasi ITERA.
 
 - **Kelas:** [RA]
 - **Lokasi kelompok:** [3] — [Stadio San Rio] (3)
-- **Laporan:** [`laporan-latex/main.pdf` atau `laporan-typst/main.pdf`]
+- **Laporan:** [`laporan-latex/main.pdf`]
 
 ## Cara Menjalankan
 
