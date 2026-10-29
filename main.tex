@@ -1,0 +1,656 @@
+% =====================================================================
+% Template Laporan Tugas — Workshop Deep Learning (Teknik Telekomunikasi ITERA)
+% Studi Ablasi RNN, LSTM, GRU vs ANN untuk Prediksi Trafik Seluler
+%
+% Format IEEE conference dua kolom, MAKSIMAL 6 HALAMAN termasuk referensi.
+% Compile: pdflatex main && bibtex main && pdflatex main && pdflatex main
+%          (atau: latexmk -pdf main.tex). Bisa juga diunggah ke Overleaf.
+%
+% Teks bertanda [ ... ] adalah petunjuk: HAPUS dan ganti dengan isi kalian.
+% =====================================================================
+\documentclass[conference,a4paper]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage[indonesian]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{cite}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\graphicspath{{gambar/}}
+
+% Penanda petunjuk (hapus pemakaiannya di versi akhir)
+\newcommand{\petunjuk}[1]{\textcolor{gray}{[#1]}}
+
+\begin{document}
+
+\title{Studi Ablasi RNN, LSTM, dan GRU dibandingkan ANN untuk Prediksi Trafik Seluler Kota Milan}
+
+% Satu blok per anggota (maks. 3). Hapus blok yang tidak dipakai.
+\author{
+\IEEEauthorblockN{Grasia Okta Adelia}
+\IEEEauthorblockA{NIM 124400059\\
+Teknik Telekomunikasi, ITERA\\
+grasia.124400059@student.itera.ac.id}
+\and
+\IEEEauthorblockN{Egista Marga Kola}
+\IEEEauthorblockA{NIM 124400003\\
+Teknik Telekomunikasi, ITERA\\
+egista.124400003@student.itera.ac.id}
+\and
+\IEEEauthorblockN{Muhammad Allam Dzaky}
+\IEEEauthorblockA{NIM 124400013\\
+Teknik Telekomunikasi, ITERA\\
+muhammad.1244000013@student.itera.ac.id}
+}
+
+\maketitle
+
+\begin{abstract}
+\Prediksi trafik internet per jam merupakan tantangan dalam pengelolaan jaringan telekomunikasi karena pola penggunaan berubah berdasarkan waktu dan lokasi. Penelitian ini menggunakan dataset Telecom Italia pada kotak geografis Duomo dan lokasi kelompok, yaitu Stadio San Siro, untuk mengevaluasi empat arsitektur, yaitu Artificial Neural Network (ANN), Recurrent Neural Network (RNN), Long Short-Term Memory (LSTM), dan Gated Recurrent Unit (GRU). Eksperimen ablasi menguji pengaruh panjang jendela input (window size), jumlah unit tersembunyi (hidden size), jumlah lapisan (layers), laju pembelajaran (learning rate), pemilihan fitur, ukuran batch, dan fungsi loss. Setiap konfigurasi dievaluasi menggunakan tiga seed. Pada Duomo, konfigurasi terbaik menurunkan test MAE ANN dari 309,9 menjadi 273,3, GRU dari 237,2 menjadi 233,8, dan LSTM dari 273,6 menjadi 247,3, sedangkan RNN meningkat dari 229,6 menjadi 242,9. Pada Stadio San Siro, LSTM menghasilkan test MAE 10,9 ± 0,1, turun 20,4 persen dari acuan 13,7 ± 0,8, sementara GRU mencapai 11,4 ± 0,3, turun 10,9 persen dari acuan 12,8 ± 0,6. Hasil ini menunjukkan bahwa efektivitas optimasi hiperparameter bergantung pada arsitektur dan lokasi, sehingga evaluasi lintas lokasi diperlukan untuk menilai kemampuan generalisasi model.}
+\end{abstract}
+
+\begin{IEEEkeywords}
+prediksi trafik seluler, RNN, LSTM, GRU, studi ablasi
+\end{IEEEkeywords}
+
+% ---------------------------------------------------------------------
+\section{Pendahuluan}
+
+Prediksi trafik internet diperlukan untuk mendukung perencanaan kapasitas dan alokasi sumber daya jaringan berdasarkan kebutuhan pengguna yang berubah terhadap waktu \cite{zhang2021fedda}. Penelitian ini membandingkan ANN dengan model sekuensial RNN, LSTM \cite{hochreiter1997lstm}, dan GRU \cite{cho2014gru} untuk mengevaluasi kinerja prediksi berdasarkan data historis. Studi ablasi dilakukan untuk menganalisis pengaruh hiperparameter dan pemilihan fitur terhadap kinerja model. Kontribusi penelitian ini meliputi:
+\begin{itemize}
+    \item Membandingkan kinerja ANN, RNN, LSTM, dan GRU dalam prediksi trafik per jam.
+    \item Menganalisis pengaruh hiperparameter dan fitur melalui studi ablasi.
+    \item Mengevaluasi konfigurasi terbaik terhadap model acuan serta menguji kinerjanya pada lokasi kelompok.
+\end{itemize}
+% ---------------------------------------------------------------------
+\section{Data dan Metode}
+
+\subsection{Dataset}
+
+Penelitian ini menggunakan dataset Telecom Italia Big Data Challenge yang merekam aktivitas jaringan seluler di Kota Milan, Italia. Dataset tersebut mencakup aktivitas internet, panggilan, dan SMS yang dikelompokkan berdasarkan lokasi geografis dan waktu \cite{barlacchi2015milan}. Eksperimen dilakukan pada kotak geografis Duomo dengan ID 5060 sebagai lokasi acuan dan kawasan Stadio San Siro sebagai lokasi kelompok untuk mengevaluasi kinerja model pada lokasi yang berbeda. Data trafik diolah dalam resolusi per jam dan digunakan untuk membandingkan kinerja ANN, RNN, LSTM, dan GRU dalam memprediksi trafik internet berdasarkan data historis.
+
+Gambar~\ref{fig:peta} menunjukkan lokasi geografis yang digunakan dalam eksperimen pada wilayah Milan.
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.85\linewidth]{peta_lokasi_tugas.png}
+    \caption{Peta grid geografis dan lokasi eksperimen di Kota Milan.}
+    \label{fig:peta}
+\end{figure}
+
+
+\subsection{Pembagian Data dan Praproses}
+
+Data dibagi secara kronologis menjadi data latih
+(\textit{training}), validasi (\textit{validation}), pengujian
+(\textit{test}), dan periode Natal. Pembagian berdasarkan waktu
+dilakukan untuk mempertahankan urutan temporal dan menghindari
+kebocoran informasi dari masa mendatang ke dalam data latih.
+
+Standardisasi dilakukan menggunakan statistik dari data
+sebelum periode validasi. Parameter standardisasi yang sama
+kemudian diterapkan pada data validasi dan pengujian agar
+informasi dari data evaluasi tidak memengaruhi proses pelatihan.
+
+Selanjutnya, data disusun menggunakan metode \textit{sliding window}
+dengan panjang jendela 24 jam untuk memprediksi trafik internet
+pada satu jam berikutnya. Data ini digunakan sebagai masukan
+bagi model ANN, RNN, LSTM, dan GRU.
+
+\subsection{Model dan Konfigurasi Acuan}
+
+Konfigurasi awal yang digunakan dalam eksperimen dirangkum
+pada Tabel~\ref{tab:acuan}. Konfigurasi ini digunakan untuk
+membandingkan kinerja ANN, RNN, LSTM, dan GRU sebelum
+dilakukan eksperimen ablasi.
+
+\begin{table}[!t]
+    \centering
+    \caption{Konfigurasi Acuan}
+    \label{tab:acuan}
+    \footnotesize
+    \begin{tabular}{ll}
+        \toprule
+        Hiperparameter & Nilai Acuan \\
+        \midrule
+        Jendela masukan & 24 jam \\
+        Horizon prediksi & 1 jam \\
+        Hidden size & ANN: 32; RNN: 68; LSTM: 33; GRU: 38 \\
+        Jumlah lapisan & ANN: 2; RNN/LSTM/GRU: 1 \\
+        Fitur masukan & 7 fitur trafik dan waktu \\
+        Optimizer & Adam \\
+        Laju pembelajaran & $10^{-3}$ \\
+        Batch size & 64 \\
+        Early stopping & Patience 30; maks. 300 epoch \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{Protokol Ablasi dan Evaluasi}
+
+Eksperimen ablasi dilakukan dengan mengubah satu faktor
+pada setiap percobaan, sedangkan parameter lainnya
+dipertahankan pada nilai acuan. Lima faktor yang diuji
+meliputi panjang jendela $W \in \{6,12,24,48,168\}$,
+ukuran \textit{hidden} $\in \{16,32,64,128\}$, jumlah
+lapisan $\in \{1,2,3\}$, laju pembelajaran
+$\in \{10^{-4},10^{-3},10^{-2}\}$, dan kelompok fitur
+masukan $\in \{\texttt{net},\texttt{net+call+sms},
+\texttt{net+waktu},\texttt{semua}\}$.
+
+Dua faktor tambahan yang dipilih adalah ukuran
+\textit{batch} (16, 64, dan 256) serta fungsi
+\textit{loss} (MSE, MAE, dan Huber). Hipotesis awal
+untuk ukuran \textit{batch} adalah bahwa ukuran yang
+lebih kecil dapat menghasilkan pembaruan parameter
+yang lebih sering, tetapi juga lebih berfluktuasi.
+Untuk fungsi \textit{loss}, MAE atau Huber diperkirakan
+dapat memberikan hasil yang kompetitif terhadap metrik
+MAE, terutama jika terdapat nilai trafik ekstrem.
+
+Setiap konfigurasi diuji menggunakan tiga \textit{seed},
+yaitu 0, 1, dan 2. Kinerja dievaluasi menggunakan MAE,
+RMSE, dan MAPE pada skala trafik asli. Hasil dilaporkan
+sebagai rata-rata dan simpangan baku dari tiga
+\textit{seed}. Pemilihan konfigurasi terbaik untuk setiap
+model didasarkan pada rata-rata MAE validasi. Data
+pengujian dan periode Natal digunakan untuk evaluasi
+akhir, bukan untuk memilih konfigurasi.
+
+Pelatihan dilakukan menggunakan [CPU/GPU, sesuaikan
+dengan perangkat yang digunakan]. Total waktu pelatihan
+dicatat untuk setiap proses eksperimen dan dirangkum
+dari hasil pencatatan pada notebook.
+
+% ---------------------------------------------------------------------
+
+\subsection{Baseline Naif dan Acuan}
+
+Baseline naif digunakan sebagai pembanding dengan
+memprediksi trafik pada satu jam berikutnya menggunakan
+nilai trafik pada jam sebelumnya. Selanjutnya, kinerja
+baseline dibandingkan dengan model ANN, RNN, LSTM, dan
+GRU menggunakan konfigurasi acuan. Evaluasi dilakukan
+pada minggu pengujian dan periode Natal menggunakan
+metrik MAE, RMSE, dan MAPE pada skala asli.
+
+\begin{table}[!t]
+    \centering
+    \caption{MAE Konfigurasi Acuan pada Duomo}
+    \label{tab:baseline}
+    \footnotesize
+    \begin{tabular}{lrr}
+        \toprule
+        Model & Test MAE & Natal MAE \\
+        \midrule
+        ANN  & $309.9 \pm 5.9$ & $680.1 \pm 52.0$ \\
+        RNN  & $229.6 \pm 5.1$ & $421.2 \pm 2.4$ \\
+        LSTM & $273.6 \pm 25.4$ & $586.0 \pm 56.8$ \\
+        GRU  & $237.2 \pm 9.3$ & $468.2 \pm 21.8$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsubsection{A1. Pengaruh Panjang Jendela}
+
+Ablasi A1 menguji panjang jendela masukan
+$W \in \{6,12,24,48,168\}$ jam. Hasil pengujian
+ditampilkan pada Tabel~\ref{tab:ablasi-w}. Panjang
+jendela yang lebih besar tidak selalu menghasilkan
+MAE yang lebih rendah. Pada ANN, MAE meningkat ketika
+jendela diperpanjang dari 6 menjadi 168 jam. Sebaliknya,
+RNN memperoleh MAE terendah pada $W=48$ jam, yaitu
+$224.5 \pm 11.7$. Hasil ini menunjukkan bahwa pengaruh
+panjang jendela bergantung pada arsitektur model.
+
+\begin{table}[!t]
+    \centering
+    \caption{Pengaruh Panjang Jendela terhadap Test MAE}
+    \label{tab:ablasi-w}
+    \footnotesize
+    \begin{tabular}{crrrr}
+        \toprule
+        $W$ (jam) & ANN & RNN & LSTM & GRU \\
+        \midrule
+        6 & $268.9 \pm 17.7$ & $228.6 \pm 5.4$ &
+        $276.3 \pm 14.7$ & $249.8 \pm 1.4$ \\
+        12 & $307.8 \pm 13.1$ & $233.2 \pm 11.2$ &
+        $302.7 \pm 17.4$ & $246.1 \pm 13.5$ \\
+        24 & $309.9 \pm 5.9$ & $229.6 \pm 5.1$ &
+        $273.6 \pm 25.4$ & $237.2 \pm 9.3$ \\
+        48 & $333.3 \pm 20.5$ & $224.5 \pm 11.7$ &
+        $304.4 \pm 27.1$ & $237.1 \pm 10.6$ \\
+        168 & $402.0 \pm 12.5$ & $233.5 \pm 4.8$ &
+        $292.8 \pm 20.0$ & $237.2 \pm 10.6$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{Ablasi Pilihan}
+
+\subsubsection{Pengaruh Ukuran Batch}
+
+Hipotesis awal pada eksperimen ini adalah ukuran batch yang
+lebih kecil dapat meningkatkan kinerja model karena pembaruan
+parameter dilakukan lebih sering, meskipun variasi pembaruan
+dapat menjadi lebih besar. Pengaruh ukuran batch diuji dengan
+membandingkan batch 16, 64, dan 256, sementara hiperparameter
+lainnya dipertahankan.
+
+Hasil menunjukkan bahwa pengaruh ukuran batch berbeda pada
+setiap arsitektur. Pada ANN, batch 256 menghasilkan test MAE
+terendah sebesar $254.5 \pm 13.2$, dibandingkan
+$302.1 \pm 12.8$ pada batch 16 dan $309.9 \pm 5.9$ pada
+batch 64. Sebaliknya, LSTM memperoleh MAE terendah pada
+batch 16, yaitu $248.9 \pm 35.2$, sedangkan GRU juga
+memperoleh MAE terendah pada batch 16, yaitu
+$232.2 \pm 10.3$. Pada RNN, rata-rata MAE batch 16 dan
+batch 256 sama-sama sebesar 228.3, tetapi batch 16 memiliki
+simpangan baku yang lebih rendah.
+
+Hasil tersebut menunjukkan bahwa batch yang lebih kecil
+tidak selalu menghasilkan kinerja terbaik pada semua model.
+Hipotesis awal hanya didukung pada beberapa arsitektur,
+sehingga pemilihan ukuran batch perlu mempertimbangkan
+karakteristik masing-masing model.
+
+\begin{table}[!t]
+    \centering
+    \caption{Pengaruh Ukuran Batch terhadap Test MAE}
+    \label{tab:ablasi-batch}
+    \footnotesize
+    \begin{tabular}{crrrr}
+        \toprule
+        Batch & ANN & RNN & LSTM & GRU \\
+        \midrule
+        16
+        & $302.1 \pm 12.8$
+        & $228.3 \pm 6.7$
+        & $248.9 \pm 35.2$
+        & $232.2 \pm 10.3$ \\
+        64
+        & $309.9 \pm 5.9$
+        & $229.6 \pm 5.1$
+        & $273.6 \pm 25.4$
+        & $237.2 \pm 9.3$ \\
+        256
+        & $254.5 \pm 13.2$
+        & $228.3 \pm 17.4$
+        & $269.6 \pm 10.8$
+        & $233.8 \pm 15.6$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsubsection{Pengaruh Fungsi Loss}
+
+Hipotesis awal pada eksperimen ini adalah fungsi loss MAE
+dapat menghasilkan prediksi dengan MAE lebih rendah karena
+fungsi optimasi yang digunakan sesuai dengan metrik evaluasi
+utama. Eksperimen membandingkan fungsi loss MSE, MAE, dan
+Huber dengan mempertahankan hiperparameter lainnya.
+
+Hasil pengujian menunjukkan bahwa loss MAE menghasilkan
+test MAE terendah pada keempat arsitektur. Pada RNN, test
+MAE turun dari $229.6 \pm 5.1$ dengan loss MSE menjadi
+$207.6 \pm 2.8$ dengan loss MAE. Pola serupa terlihat pada
+ANN, LSTM, dan GRU. ANN memperoleh MAE sebesar
+$297.2 \pm 10.9$, LSTM sebesar $265.9 \pm 17.8$, dan
+GRU sebesar $229.4 \pm 16.5$ ketika menggunakan loss MAE.
+
+Dengan demikian, hasil eksperimen mendukung hipotesis awal
+untuk metrik MAE pada seluruh arsitektur yang diuji.
+Namun, hasil ini tidak cukup untuk menyimpulkan bahwa loss
+MAE juga menghasilkan RMSE terbaik karena RMSE tidak
+ditampilkan pada perbandingan ini.
+
+\begin{table}[!t]
+    \centering
+    \caption{Pengaruh Fungsi Loss terhadap Test MAE}
+    \label{tab:ablasi-loss}
+    \footnotesize
+    \begin{tabular}{lrrrr}
+        \toprule
+        Loss & ANN & RNN & LSTM & GRU \\
+        \midrule
+        MSE
+        & $309.9 \pm 5.9$
+        & $229.6 \pm 5.1$
+        & $273.6 \pm 25.4$
+        & $237.2 \pm 9.3$ \\
+        MAE
+        & $297.2 \pm 10.9$
+        & $207.6 \pm 2.8$
+        & $265.9 \pm 17.8$
+        & $229.4 \pm 16.5$ \\
+        Huber
+        & $315.6 \pm 4.6$
+        & $225.3 \pm 3.0$
+        & $271.6 \pm 30.3$
+        & $236.5 \pm 7.7$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+
+\subsection{Konfigurasi Terbaik}
+
+Konfigurasi terbaik untuk setiap arsitektur ditentukan
+berdasarkan rata-rata MAE pada data validasi dari tiga seed.
+Data test dan periode Natal digunakan untuk mengevaluasi
+konfigurasi terpilih, bukan untuk menentukan konfigurasi
+terbaik. Hasil konfigurasi terbaik kemudian dibandingkan
+dengan konfigurasi acuan pada Tabel~\ref{tab:hasil-terbaik}.
+
+\begin{table}[!t]
+    \centering
+    \caption{Perbandingan Konfigurasi Acuan dan Terbaik}
+    \label{tab:hasil-terbaik}
+    \footnotesize
+    \begin{tabular}{llrr}
+        \toprule
+        Model & Konfigurasi & Test MAE & Natal MAE \\
+        \midrule
+        ANN & Acuan
+        & $309.9 \pm 5.9$ & $680.1 \pm 52.0$ \\
+        ANN & Terbaik
+        & $272.9 \pm 23.5$ & $607.6 \pm 101.4$ \\
+        \midrule
+        RNN & Acuan
+        & $229.6 \pm 5.1$ & $421.2 \pm 2.4$ \\
+        RNN & Terbaik
+        & $242.2 \pm 13.3$ & $421.7 \pm 27.9$ \\
+        \midrule
+        LSTM & Acuan
+        & $273.6 \pm 25.4$ & $586.0 \pm 56.8$ \\
+        LSTM & Terbaik
+        & $246.6 \pm 12.0$ & $462.7 \pm 5.2$ \\
+        \midrule
+        GRU & Acuan
+        & $237.2 \pm 9.3$ & $468.2 \pm 21.8$ \\
+        GRU & Terbaik
+        & $228.6 \pm 6.6$ & $433.2 \pm 25.4$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Berdasarkan hasil tersebut, konfigurasi terbaik meningkatkan
+kinerja ANN, LSTM, dan GRU pada minggu test dibandingkan
+konfigurasi acuan. Penurunan MAE paling besar di antara
+ketiga model tersebut terlihat pada ANN, dari 309.9 menjadi
+272.9. GRU juga mengalami penurunan MAE dari 237.2 menjadi
+228.6. Sebaliknya, RNN mengalami kenaikan MAE dari 229.6
+menjadi 242.2, sehingga konfigurasi terbaik berdasarkan
+validasi tidak selalu menghasilkan kinerja test yang lebih
+baik.
+
+Pada periode Natal, MAE ANN, LSTM, dan GRU juga lebih
+rendah dibandingkan konfigurasi acuannya. Sementara itu,
+MAE RNN relatif sama, yaitu 421.2 pada konfigurasi acuan
+dan 421.7 pada konfigurasi terbaik. Hasil ini menunjukkan
+bahwa pengaruh perubahan hiperparameter dapat berbeda
+antara minggu test dan periode Natal.
+
+
+\subsection{Uji Generalisasi}
+
+Uji generalisasi dilakukan pada Stadio San Siro, yaitu
+lokasi kelompok dengan kode 3 dan grid 5738. Konfigurasi
+acuan dan konfigurasi terbaik dilatih serta dievaluasi pada
+lokasi ini untuk melihat apakah hasil yang diperoleh pada
+Duomo juga berlaku di lokasi yang berbeda.
+
+\begin{table}[!t]
+    \centering
+    \caption{Hasil Uji Generalisasi di Stadio San Siro}
+    \label{tab:generalisasi}
+    \footnotesize
+    \begin{tabular}{llrr}
+        \toprule
+        Model & Konfigurasi & Test MAE & Natal MAE \\
+        \midrule
+        ANN & Acuan
+        & $13.6 \pm 1.3$ & $13.4 \pm 3.0$ \\
+        ANN & Terbaik
+        & $15.1 \pm 1.3$ & $5.0 \pm 0.5$ \\
+        \midrule
+        RNN & Acuan
+        & $12.7 \pm 0.1$ & $9.1 \pm 0.7$ \\
+        RNN & Terbaik
+        & $12.9 \pm 0.4$ & $9.3 \pm 0.6$ \\
+        \midrule
+        LSTM & Acuan
+        & $13.7 \pm 0.8$ & $7.0 \pm 0.4$ \\
+        LSTM & Terbaik
+        & $11.2 \pm 0.9$ & $6.2 \pm 0.2$ \\
+        \midrule
+        GRU & Acuan
+        & $12.8 \pm 0.6$ & $9.0 \pm 0.4$ \\
+        GRU & Terbaik
+        & $11.4 \pm 0.3$ & $6.3 \pm 0.8$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Pada minggu test di Stadio San Siro, konfigurasi acuan RNN
+memperoleh MAE terendah sebesar $12.7 \pm 0.1$, diikuti
+GRU sebesar $12.8 \pm 0.6$. Pada konfigurasi terbaik,
+LSTM memperoleh MAE terendah sebesar $11.2 \pm 0.9$,
+diikuti GRU sebesar $11.4 \pm 0.3$. Dengan demikian,
+urutan kinerja model berubah setelah konfigurasi terbaik
+diterapkan: LSTM menjadi model dengan MAE terendah,
+sedangkan RNN tidak lagi menjadi model terbaik.
+
+Pada periode Natal, konfigurasi terbaik menghasilkan MAE
+yang lebih rendah untuk ANN, LSTM, dan GRU dibandingkan
+konfigurasi acuan. ANN menunjukkan penurunan paling besar,
+dari $13.4 \pm 3.0$ menjadi $5.0 \pm 0.5$. Sebaliknya,
+MAE RNN sedikit meningkat dari $9.1 \pm 0.7$ menjadi
+$9.3 \pm 0.6$.
+
+Perbedaan hasil antara Duomo dan Stadio San Siro menunjukkan
+bahwa kinerja model bergantung pada lokasi dan periode
+evaluasi. Perubahan pola trafik pada lokasi yang berbeda
+dapat memengaruhi kemampuan model dalam memprediksi trafik.
+Oleh karena itu, model dengan kinerja terbaik pada satu
+lokasi belum tentu menjadi model terbaik pada lokasi lain.
+
+% ---------------------------------------------------------------------
+
+\section{Pembahasan}
+
+Hasil eksperimen menunjukkan bahwa kinerja model tidak hanya
+ditentukan oleh arsitektur, tetapi juga dipengaruhi oleh
+pemilihan hiperparameter dan fitur masukan. Tidak ada satu
+konfigurasi yang selalu memberikan hasil terbaik pada semua
+arsitektur dan periode evaluasi. Oleh karena itu, hasil ablasi
+perlu dilihat sebagai interaksi antara arsitektur model,
+konfigurasi pelatihan, dan karakteristik data trafik.
+
+\subsection{Pengaruh Hiperparameter terhadap Kinerja Model}
+
+Panjang jendela masukan memberikan pengaruh yang berbeda
+pada setiap arsitektur. Pada ANN, test MAE meningkat dari
+$268.9 \pm 17.7$ ketika menggunakan jendela 6 jam menjadi
+$402.0 \pm 12.5$ pada jendela 168 jam. Sebaliknya, RNN
+memperoleh MAE terendah pada jendela 48 jam, yaitu
+$224.5 \pm 11.7$. Hasil ini menunjukkan bahwa penambahan
+informasi historis tidak selalu meningkatkan kemampuan
+prediksi. Jendela yang terlalu panjang dapat menambah
+informasi yang kurang relevan, sedangkan panjang jendela
+yang sesuai dapat membantu model menangkap pola temporal.
+
+Jumlah lapisan juga memengaruhi setiap arsitektur secara
+berbeda. Pada RNN, test MAE terendah diperoleh dengan dua
+lapisan, yaitu $228.4 \pm 8.2$, dibandingkan
+$229.6 \pm 5.1$ pada satu lapisan dan $245.5 \pm 19.1$
+pada tiga lapisan. Pada LSTM, test MAE meningkat dari
+$273.6 \pm 25.4$ pada satu lapisan menjadi
+$412.6 \pm 54.2$ pada tiga lapisan. Hal ini menunjukkan
+bahwa penambahan kompleksitas model tidak otomatis
+meningkatkan akurasi. Dengan jumlah data latih yang terbatas,
+model yang lebih kompleks berpotensi lebih sulit dilatih
+atau kurang mampu melakukan generalisasi.
+
+Pengaruh laju pembelajaran juga bergantung pada arsitektur.
+Pada learning rate $0.01$, LSTM dan GRU menghasilkan
+rata-rata test MAE yang lebih rendah daripada konfigurasi
+acuan dengan learning rate $0.001$. Sebaliknya, ANN
+menghasilkan MAE yang lebih tinggi pada learning rate
+$0.01$ dibandingkan konfigurasi acuannya. Perbedaan ini
+menunjukkan bahwa laju pembelajaran yang sesuai untuk satu
+arsitektur belum tentu sesuai untuk arsitektur lainnya.
+Namun, hasil test saja tidak digunakan untuk memilih
+konfigurasi terbaik; pemilihan tetap harus didasarkan pada
+MAE validasi.
+
+Kelompok fitur masukan juga memengaruhi hasil prediksi.
+Pada RNN, penggunaan fitur trafik \textit{net}, \textit{call},
+dan \textit{sms} menghasilkan test MAE sebesar
+$227.6 \pm 2.2$, sedikit lebih rendah daripada
+$229.6 \pm 5.1$ ketika seluruh tujuh fitur digunakan.
+Pada GRU, kelompok fitur \textit{net+waktu} menghasilkan
+MAE $239.7 \pm 25.4$, sedangkan penggunaan seluruh fitur
+menghasilkan $237.2 \pm 9.3$. Hasil tersebut menunjukkan
+bahwa penambahan fitur tidak selalu memperbaiki prediksi.
+Manfaat fitur tambahan bergantung pada seberapa relevan
+informasi tersebut terhadap pola trafik yang dipelajari model.
+
+Pada eksperimen ukuran batch, tidak terdapat satu nilai
+yang terbaik untuk semua model. Batch 256 menghasilkan
+MAE ANN terendah, sedangkan batch 16 menghasilkan MAE
+terendah pada LSTM dan GRU. Pada RNN, rata-rata MAE batch
+16 dan 256 sama-sama sebesar 228.3, tetapi simpangan baku
+batch 16 lebih rendah. Sementara itu, penggunaan loss MAE
+menghasilkan test MAE terendah pada keempat arsitektur
+dibandingkan loss MSE dan Huber. Hasil ini konsisten dengan
+tujuan evaluasi menggunakan MAE, meskipun tidak cukup untuk
+menyimpulkan bahwa loss MAE juga menghasilkan RMSE terbaik.
+
+Secara keseluruhan, hasil ablasi memperlihatkan bahwa
+panjang jendela, jumlah lapisan, laju pembelajaran, kelompok
+fitur, ukuran batch, dan fungsi loss dapat memengaruhi
+kinerja model. Namun, besarnya pengaruh setiap faktor
+berbeda menurut arsitektur. Berdasarkan hasil yang tersedia,
+belum dapat ditentukan secara pasti satu hiperparameter
+yang paling berpengaruh untuk seluruh model karena faktor
+yang diuji memiliki rentang dan konfigurasi percobaan
+yang berbeda.
+
+\subsection{Perbandingan Antararsitektur dan Variasi Seed}
+
+Pada konfigurasi acuan di Duomo, RNN memperoleh test MAE
+terendah, yaitu $229.6 \pm 5.1$, diikuti GRU dengan
+$237.2 \pm 9.3$, LSTM dengan $273.6 \pm 25.4$, dan ANN
+dengan $309.9 \pm 5.9$. Hasil ini menunjukkan bahwa pada
+konfigurasi acuan, model rekuren RNN dan GRU memberikan
+prediksi yang lebih akurat daripada ANN berdasarkan MAE.
+Akan tetapi, hasil tersebut tidak berarti bahwa RNN selalu
+lebih unggul pada setiap konfigurasi, sebagaimana terlihat
+pada eksperimen ablasi.
+
+Simpangan baku antar-seed juga perlu diperhatikan dalam
+menafsirkan perbedaan hasil. Pada konfigurasi acuan,
+simpangan baku ANN relatif kecil, yaitu 5.9, sedangkan
+LSTM memiliki simpangan baku 25.4. Pada ablasi ukuran
+jendela, RNN dengan jendela 48 jam menghasilkan
+$224.5 \pm 11.7$, sehingga variasi antar-seed tetap perlu
+dipertimbangkan ketika membandingkannya dengan konfigurasi
+lain yang selisih rata-ratanya kecil. Dengan demikian,
+perbedaan rata-rata MAE tidak selalu menunjukkan perbedaan
+kinerja yang konsisten pada setiap seed.
+
+Perbandingan ini belum membuktikan secara statistik apakah
+perbedaan antararsitektur lebih besar daripada variasi
+antar-seed. Pengujian menggunakan tiga seed memberikan
+gambaran awal tentang variasi hasil, tetapi jumlah tersebut
+masih terbatas. Oleh karena itu, simpangan baku digunakan
+sebagai indikator variasi eksperimen, bukan sebagai bukti
+signifikansi statistik.
+
+\subsection{Generalisasi dan Periode Natal}
+
+Kinerja model juga perlu dinilai pada periode yang berbeda
+dari data latih. Pada konfigurasi acuan di Duomo, seluruh
+arsitektur menghasilkan MAE lebih tinggi pada periode Natal
+dibandingkan minggu test. Sebagai contoh, MAE RNN meningkat
+dari $229.6 \pm 5.1$ pada minggu test menjadi
+$421.2 \pm 2.4$ pada periode Natal. Pola ini menunjukkan
+bahwa hasil prediksi dapat memburuk ketika karakteristik
+trafik berubah dibandingkan periode yang digunakan untuk
+pelatihan.
+
+Perubahan kinerja pada periode Natal dapat berkaitan dengan
+perubahan pola aktivitas pengguna selama periode liburan.
+Namun, eksperimen ini tidak secara langsung menguji penyebab
+perubahan trafik tersebut, sehingga hubungan itu perlu
+dipandang sebagai interpretasi yang masuk akal, bukan
+kesimpulan kausal.
+
+Uji pada Stadio San Siro juga penting karena model yang
+berkinerja baik di Duomo belum tentu mempertahankan urutan
+kinerja yang sama di lokasi lain. Perbedaan karakteristik
+lokasi, seperti pola aktivitas dan tingkat trafik, dapat
+memengaruhi kesesuaian model terhadap data. Karena itu,
+hasil generalisasi perlu dibandingkan berdasarkan perubahan
+MAE acuan dan konfigurasi terbaik pada masing-masing
+lokasi, bukan hanya berdasarkan nilai MAE absolut antar-lokasi.
+
+\subsection{Keterbatasan Studi}
+
+Studi ini memiliki beberapa keterbatasan. Pertama, data
+berasal dari wilayah Milan sehingga hasilnya belum tentu
+berlaku untuk kota atau jaringan lain dengan karakteristik
+pengguna berbeda. Kedua, periode pelatihan relatif singkat,
+yaitu sekitar empat minggu, sehingga model memiliki
+keterbatasan dalam mempelajari variasi musiman atau pola
+trafik jangka panjang. Ketiga, evaluasi menggunakan satu
+pembagian waktu kronologis. Hasilnya dapat berubah apabila
+periode pelatihan, validasi, dan pengujian dipindahkan.
+
+Selain itu, setiap konfigurasi dijalankan menggunakan tiga
+seed. Jumlah ini memberikan gambaran awal tentang variasi
+hasil, tetapi belum cukup untuk menggambarkan seluruh
+ketidakpastian proses pelatihan secara menyeluruh. Ablasi
+juga mengubah satu faktor pada satu waktu, sehingga
+interaksi ant hiperparameter belum diuji secara sistematis.
+Sebagai contoh, ukuran batch yang baik pada satu laju
+pembelajaran belum tentu memberikan hasil yang sama pada
+laju pembelajaran lainnya.
+
+Dengan keterbatasan tersebut, hasil penelitian ini lebih
+tepat digunakan untuk membandingkan perilaku ANN, RNN,
+LSTM, dan GRU pada konfigurasi serta periode yang diuji,
+bukan untuk menetapkan satu arsitektur sebagai model terbaik
+secara universal. Penelitian lanjutan dapat menggunakan
+lebih banyak seed, beberapa pembagian waktu, periode data
+yang lebih panjang, dan pengujian pada lebih banyak lokasi
+untuk memperoleh kesimpulan yang lebih kuat.
+% ---------------------------------------------------------------------
+\section{Kesimpulan}
+Hasil eksperimen menunjukkan bahwa RNN memperoleh MAE terendah pada konfigurasi acuan, yaitu $229.6 \pm 5.1$ pada data uji Duomo, dibandingkan ANN, LSTM, dan GRU. Pada ablasi fungsi loss, penggunaan MAE menghasilkan nilai MAE uji terendah untuk RNN, yaitu $207.6 \pm 2.8$, dibandingkan $229.6 \pm 5.1$ dengan MSE dan $225.3 \pm 3.0$ dengan Huber. Hasil ablasi menunjukkan bahwa pilihan hiperparameter dapat memengaruhi kinerja model, tetapi konfigurasi terbaik dapat berbeda antararsitektur. Kesimpulan ini masih terbatas pada periode dan lokasi yang diuji, sehingga diperlukan pengujian pada lebih banyak lokasi dan rentang waktu untuk menilai kemampuan generalisasi secara lebih luas.
+
+% ---------------------------------------------------------------------
+\section*{Kontribusi Anggota}
+\begin{tabular}{@{}lp{0.62\linewidth}@{}}
+  Grasia Okta Adelia & Pengerjaan ablasi A1--A5; penulisan abstrak, pendahuluan, serta bagian Data dan Metode hingga Konfigurasi Terbaik. \\
+  Egista Marga Kola & Pengerjaan ablasi Bagian B; penyusunan README; penulisan bagian Uji Generalisasi hingga Perbandingan Antararsitektur dan Variasi Seed. \\
+  Muhammad Allam Dzaky & Pengerjaan Bagian C hingga penutup; penulisan bagian Generalisasi dan Periode Natal hingga Daftar Pustaka. \\
+\end{tabular}
+
+\section*{Pernyataan Penggunaan AI}
+Dalam penyusunan laporan ini, ChatGPT digunakan untuk membantu merapikan bahasa dan tata penulisan laporan, menganalisis kesalahan dalam kode, serta membantu menemukan dan memperbaiki kesalahan kode (\textit{debugging}). Seluruh angka dan hasil eksperimen yang disajikan dalam laporan diperoleh dari proses eksperimen yang dijalankan oleh kelompok.
+
+\section*{Kode dan Data}
+Kode program, notebook beserta output, dan seluruh hasil eksperimen tersedia di repositori GitHub berikut:
+\url{https://github.com/grasiaoktaa/dlw-tugas-ra-124400059}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
+```
