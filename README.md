@@ -25,11 +25,11 @@ uv run jupyter lab
 
 Buka `tugas_ablasi.ipynb`, isi `LOKASI_KELOMPOK`, lalu jalankan semua sel. Semua run tercatat di `hasil/ablasi.csv`.
 
-Perangkat yang kami pakai: [contoh: laptop CPU Intel i5 / Google Colab T4], total waktu training: [x] menit.
+Perangkat yang kami pakai: [Jupyter Notebook, Visual Studio Code, dan Overleaf], total waktu training: 59.8 menit.
 
 ## Ringkasan Hasil
 
-[2–4 kalimat temuan utama, beserta angka test MAE terbaik per model.]
+Hasil eksperimen menunjukkan bahwa konfigurasi terbaik memberikan pengaruh berbeda pada setiap arsitektur model. Pada lokasi Duomo, test MAE terbaik untuk ANN adalah 273,3, RNN 242,9, LSTM 247,3, dan GRU 233,8. Pada lokasi kelompok, Stadio San Siro, LSTM menghasilkan test MAE 10,9 ± 0,1, sedangkan GRU mencapai 11,4 ± 0,3; keduanya menunjukkan penurunan error dibandingkan konfigurasi acuan. Secara keseluruhan, hasil ini menunjukkan bahwa pemilihan arsitektur dan hiperparameter perlu mempertimbangkan karakteristik lokasi karena model dengan performa baik pada satu lokasi belum tentu memberikan hasil terbaik pada lokasi lain.
 
 ## Struktur
 
